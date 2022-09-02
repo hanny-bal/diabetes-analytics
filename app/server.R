@@ -8,6 +8,10 @@ library(shinyjs)
 # activate autoreload
 options(shiny.autoreload = TRUE)
 
+# threshold values
+high_thr = 210
+low_thr = 70
+
 # read data 
 # TODO: externalize this
 df <- read.csv('../data/clarity_export_20220730.csv', sep = ';')
@@ -22,9 +26,18 @@ df <- df %>% filter(event_type == 'EGV' & !is.na(glucose_mgdl))
 df$timestamp <- ymd_hms(df$timestamp_src, tz = 'Europe/Vienna')
 df$time <- hms::as_hms(format(df$timestamp, format = "%H:%M:%S"))
 
-# Define server logic required to draw a histogram
+# grab last date
+lastRow <- tail(df, n = 1)
+lastDate <- date(lastRow[1,'timestamp'])
+
+# ----------------------------------------------------
+# - Define server logic required to draw a histogram -
+# ----------------------------------------------------
 shinyServer(function(input, output, session) {
     
+    # init date picker for daily view as to last date
+    updateDateInput(session, 'daywise_ts','Select a day to display:', value = date(lastRow[1,'timestamp'])) 
+  
     # --------------------
     #  Reactive elements - 
     # --------------------
@@ -110,30 +123,113 @@ shinyServer(function(input, output, session) {
     # --------------------------------------------------
     #  Display daily time series of blood sugar values - 
     # --------------------------------------------------
-    output$overviewTimeSeries <- renderPlot({
-      if(exists('df') && is.data.frame(get('df'))) {
-        # plot a sample day
-        df_sample <- df %>% filter(date(df$timestamp) == input$daywise_ts)
-        if(nrow(df_sample) > 0) {
-          plot(df_sample$timestamp, df_sample$glucose_mgdl) 
-        }
-      }
+    output$dailyTimeSeries <- renderPlotly({
+      
+      validate(
+        need(exists('df'), 'Could not load data.'),
+        need(is.data.frame(get('df')), 'Could not load data.'),
+      )
+      
+      df_sample <- df %>% filter(date(df$timestamp) == input$daywise_ts)
+      
+      validate(
+        need(nrow(df_sample) > 0, 'No data available on the selected day.')
+      )
+      
+      #plot(df_sample$timestamp, df_sample$glucose_mgdl) 
+      
+      plot_ly(df_sample, type = 'scatter', mode = 'lines') %>% 
+        add_trace(x = ~timestamp, y = ~glucose_mgdl, 
+                  name = 'Blood sugar',
+                  line = list(color = 'rgb(0,0,0)', width = 4),
+                  hoverinfo = 'text',
+                  text = ~paste(glucose_mgdl, 'mg/dl at', time)) %>% 
+        # lower threshold
+        add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
+                     y = ~low_thr, yend = ~low_thr,
+                     line = list(color = 'rgb(205, 12, 24)', dash = 'dash'),
+                     name = 'High threshold') %>% 
+        # upper threshold
+        add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
+                     y = ~high_thr, yend = ~high_thr,
+                     line = list(color = 'rgb(205, 12, 24)', dash = 'dash'),
+                     name = 'Low threshold') %>% 
+        layout(xaxis = list(title='Time'), 
+               yaxis = list(title = 'Blood sugar (mg/dl)'),
+               title = paste('Glucose values on', input$daywise_ts),
+               showlegend = FALSE)
     })
     
     # --------------------------------------------------
     #  Display daily time series of blood sugar values - 
     # --------------------------------------------------
-    output$patternRecResult <- renderPlot({
+    output$patternRecResultSimple <- renderPlot({
       if(exists('df') && is.data.frame(get('df'))) {
         res <- tsmp_result()
         
         validate(
-          need(!is.null(res), "Please select another time-frame.")
+          need(!is.null(res), "Please select another time-frame."),
         )
         
         # visualize the result
         visualize(motifs(res))
       }
+    })
+    
+    output$patternRecResult <- renderPlotly({
+      res <- tsmp_result()
+      df_sample <- pattern_rec_sample()
+      
+      validate(
+        need(!is.null(res), "Please select another time-frame."),
+        need(!is.na(df_sample), "Could not load data."),
+        need(nrow(df_sample) > 0, "Not enough values in date range.")
+      )
+      
+      # visualize the entire time series
+      fig <- plot_ly(df_sample, type = 'scatter', mode = 'lines', height = 200) %>% 
+        add_trace(x = ~timestamp, y = ~glucose_mgdl, 
+                  name = 'Blood sugar',
+                  line = list(color = 'rgb(0,0,0)', width = 1.5),
+                  hoverinfo = 'text',
+                  text = ~paste(glucose_mgdl, 'mg/dl on', date(timestamp), "at", time)) %>% 
+        layout(xaxis = list(title='Day/Time'), 
+               yaxis = list(title = 'Blood sugar (mg/dl)'),
+               title = paste('Data'),
+               showlegend = FALSE)
+      
+      # add locations of patterns
+      pattern_locations1 <- tsmp_motif_1()
+      pattern_locations2 <- tsmp_motif_2()
+      pattern_locations3 <- tsmp_motif_3()
+      
+      # add main locations to the plot (thick lines)
+      main_pattern1 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
+                  x0 = df_sample[pattern_locations1[1], 'timestamp'], 
+                  x1 = df_sample[pattern_locations1[1], 'timestamp'],
+                  line = list(color = "red", width = 2.5))
+      main_pattern2 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
+                   x0 = df_sample[pattern_locations2[1], 'timestamp'], 
+                   x1 = df_sample[pattern_locations2[1], 'timestamp'],
+                   line = list(color = "blue", width = 2.5))
+      main_pattern3 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
+                   x0 = df_sample[pattern_locations3[1], 'timestamp'], 
+                   x1 = df_sample[pattern_locations3[1], 'timestamp'],
+                   line = list(color = "green", width = 2.5))
+      shapes <- list(main_pattern1, main_pattern2, main_pattern3)
+      
+      fig <- fig %>% layout(shapes = shapes)
+      
+      # add neighbours
+      for(i in 2:length(pattern_locations1)) {
+        neighbour_pattern <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
+                              x0 = df_sample[pattern_locations1[i], 'timestamp'], 
+                              x1 = df_sample[pattern_locations1[i], 'timestamp'],
+                              line = list(color = "red", width = 1, dash = 'dash'))
+        shapes <- append(shapes, neighbour_pattern)
+      }
+      
+      fig
     })
     
     # ----------------------------------------------

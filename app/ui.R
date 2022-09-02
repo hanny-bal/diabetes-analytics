@@ -1,5 +1,6 @@
 library(shiny)
 library(shinyjs)
+library(plotly)
 
 # Define UI
 shinyUI(
@@ -13,11 +14,11 @@ shinyUI(
     tabPanel("Daily",
      sidebarLayout(
        sidebarPanel(
-         dateInput('daywise_ts','Select a day to display'),
+         dateInput('daywise_ts','Select a day to display:'),
        ),
        # Show a plot of the generated distribution
        mainPanel(
-         plotOutput("overviewTimeSeries"),
+         plotlyOutput("dailyTimeSeries"),
        )
      )
     ),
@@ -28,7 +29,7 @@ shinyUI(
     tabPanel("Pattern Recognition",
       sidebarLayout(
         sidebarPanel(
-          dateRangeInput('pattern_date_range', 'Select a range to start pattern analysis',
+          dateRangeInput('pattern_date_range', 'Select a range to start pattern analysis:',
                     start = '2022-07-01', end = '2022-07-14'),
           sliderInput('pattern_window_size', 'How many data points would consider a pattern?',  
                       value = 40, min = 10, max = 80),
@@ -36,7 +37,8 @@ shinyUI(
         
         # Show a plot of the generated distribution
         mainPanel(
-          plotOutput("patternRecResult"),
+          plotOutput("patternRecResultSimple"),
+          plotlyOutput('patternRecResult')
         )
       ),
       
