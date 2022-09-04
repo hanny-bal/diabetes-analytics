@@ -42,6 +42,8 @@ shinyServer(function(input, output, session) {
     updateDateInput(session, 'daywise_ts','Select a day to display:', value = date(lastRow[1,'timestamp'])) 
     updateDateRangeInput(session, 'pattern_date_range', 'Select a range to start pattern analysis:',
                  start = date(lastRow[1,'timestamp'])-14, end = date(lastRow[1,'timestamp']))
+    updateDateRangeInput(session, 'overview_date_range', 'Select a date range to analyze:',
+                         start = date(lastRow[1,'timestamp'])-14, end = date(lastRow[1,'timestamp']))
   
     # --------------------
     #  Reactive elements - 
@@ -137,6 +139,19 @@ shinyServer(function(input, output, session) {
                         choices = setNames(select_choices, select_names))
       
       return(pattern_locations)
+    })
+    
+    # the sample on which to apply our "overview" analysis
+    overview_sample <- reactive({
+      df_sample <- df %>% filter(date(df$timestamp) >= input$overview_date_range[1] & 
+                      date(df$timestamp) <= input$overview_date_range[2])
+      
+      validate(
+        need(nrow(df_sample) > 0, 'No data available in selected date range.'),
+        need(!is.na(df_sample), 'Error loading data')
+      )
+      
+      return(df_sample)
     })
 
     
@@ -496,6 +511,40 @@ shinyServer(function(input, output, session) {
                                      "Friday", "Saturday")[as.POSIXlt(date(df_sample_region$timestamp[1]))$wday + 1],
                              date(df_sample_region$timestamp[1]), sep = ', '),
                showlegend = FALSE)
+    })
+    
+    # ---------------------------------------------------------
+    #  Overview page: avg, sd, distribution and median graph  - 
+    # ---------------------------------------------------------
+    
+    # mean glucose
+    output$average_glucose <- renderText({
+      df_sample <- overview_sample()
+      paste(round(mean(df_sample$glucose_mgdl)), 'mg/dl')
+    })
+    
+    # standard deviation
+    output$standard_deviation <- renderText({
+      df_sample <- overview_sample()
+      paste(round(sd(df_sample$glucose_mgdl)), 'mg/dl')
+    })
+    
+    # estimation of a1c
+    output$estimated_a1c <- renderText({
+      df_sample <- overview_sample()
+      avg_glucose <- mean(df_sample$glucose_mgdl)
+      
+      # using the formula from https://ebmcalc.com/GlycemicAssessment.htm
+      paste(round((avg_glucose + 46.7) / 28.7, digits = 1), '%')
+    })
+    
+    # coefficient of variation or glucose variability 
+    output$coefficient_of_variation <- renderText({
+      df_sample <- overview_sample()
+      sd <- sd(df_sample$glucose_mgdl)
+      mean <- mean(df_sample$glucose_mgdl)
+      
+      paste(round(sd/mean * 100, digits = 1), '%')
     })
 })
 

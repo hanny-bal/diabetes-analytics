@@ -10,9 +10,39 @@ shinyUI(
     useShinyjs(),
     theme = bs_theme(version = 4, bootswatch = "journal", primary = 'rgb(205, 12, 24)'),
     
-    # --------------------------------
-    #  Daily overview of blood sugar - 
-    # --------------------------------
+    # ------------------------
+    #  Overview / AGP Report - 
+    # ------------------------
+    tabPanel('Overview',
+       sidebarLayout(
+         sidebarPanel(
+           dateRangeInput('overview_date_range', 'Select a date range to analyze:'),
+         ),
+         mainPanel(
+           column(6,
+              h1('Overview')),
+              div(
+                style = 'margin: 20px',
+                tags$ul(
+                  tags$li(span('Average glucose: '), 
+                     textOutput('average_glucose', inline = TRUE),
+                     style = 'font-weight: bold'),
+                  tags$li(span('Estimated A1C: '), 
+                          textOutput('estimated_a1c', inline = TRUE)),
+                  tags$li(span('Standard deviation: '), 
+                    textOutput('standard_deviation', inline = TRUE)),
+                  tags$li(span('Coefficient of variation: '), 
+                          textOutput('coefficient_of_variation', inline = TRUE)),
+                  style = 'font-size: 14pt'
+                )
+            ),
+           column(6)
+         )
+       )),
+    
+    # ---------------------------
+    #  Daily blood sugar values - 
+    # ---------------------------
     tabPanel("Daily",
      sidebarLayout(
        sidebarPanel(
@@ -31,8 +61,7 @@ shinyUI(
     tabPanel("Pattern Recognition",
       sidebarLayout(
         sidebarPanel(
-          dateRangeInput('pattern_date_range', 'Select a range to start pattern analysis:',
-                    start = '2022-07-01', end = '2022-07-14'),
+          dateRangeInput('pattern_date_range', 'Select a range to start pattern analysis:'),
           sliderInput('pattern_window_size', 'How many data points would consider a pattern?',  
                       value = 40, min = 10, max = 80),
         ),
