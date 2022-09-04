@@ -1,5 +1,5 @@
 # DiAnalytics (Diabetes Analytics)
-![](https://geps.dev/progress/33)
+![](https://geps.dev/progress/70)
 
 An experimental R shiny app for analyzing patterns in blood sugar data utilizing time series analysis algorithms based on the matrix profile. For more information, see (among others) the [tsmp](https://github.com/matrix-profile-foundation/tsmp) package.
 

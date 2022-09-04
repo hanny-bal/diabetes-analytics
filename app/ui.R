@@ -19,38 +19,47 @@ shinyUI(
            dateRangeInput('overview_date_range', 'Select a date range to analyze:'),
          ),
          mainPanel(
-           column(6,
-              h1('Overview')),
-              div(
-                style = 'margin: 20px',
-                tags$ul(
-                  tags$li(span('Average glucose: '), 
-                     textOutput('average_glucose', inline = TRUE),
-                     style = 'font-weight: bold'),
-                  tags$li(span('Estimated A1C: '), 
-                          textOutput('estimated_a1c', inline = TRUE)),
-                  tags$li(span('Standard deviation: '), 
-                    textOutput('standard_deviation', inline = TRUE)),
-                  tags$li(span('Coefficient of variation: '), 
-                          textOutput('coefficient_of_variation', inline = TRUE)),
-                  style = 'font-size: 14pt'
-                )
-            ),
-           column(6)
+           fluidRow(
+             column(12,
+                    h1('Overview')),
+             column(6,
+                div(
+                  style = 'margin: 20px',
+                  tags$ul(
+                    inline = TRUE,
+                    tags$li(span('Average glucose: '), 
+                            textOutput('average_glucose', inline = TRUE),
+                            style = 'font-weight: bold'),
+                    tags$li(span('Estimated A1C: '), 
+                            textOutput('estimated_a1c', inline = TRUE)),
+                    tags$li(span('Standard deviation: '), 
+                            textOutput('standard_deviation', inline = TRUE)),
+                    tags$li(span('Coefficient of variation: '), 
+                            textOutput('coefficient_of_variation', inline = TRUE)),
+                    style = 'font-size: 14pt'
+                  )
+              )
+             ),
+             column(6, 
+                    plotlyOutput('time_in_range'))
+           ),
+           fluidRow(
+             plotlyOutput('overall_daily_trend')
+           )
          )
        )),
     
     # ---------------------------
     #  Daily blood sugar values - 
     # ---------------------------
-    tabPanel("Daily",
+    tabPanel("Daily Graph",
      sidebarLayout(
        sidebarPanel(
          dateInput('daywise_ts','Select a day to display:'),
        ),
        # Show a plot of the generated distribution
        mainPanel(
-         plotlyOutput("dailyTimeSeries"),
+         plotlyOutput("dailyTimeSeries")
        )
      )
     ),

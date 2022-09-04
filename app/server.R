@@ -9,11 +9,16 @@ library(shinyjs)
 options(shiny.autoreload = TRUE)
 
 # threshold values
-high_thr = 180
-low_thr = 70
+extreme_high_thr <- 250
+high_thr <- 180
+low_thr <- 70
+extreme_low_thr <- 50
 
 # colors 
 bloody_red <- 'rgb(205, 12, 24)'
+slimy_green <- 'rgb(41, 191, 18)'
+crayon_yellow <- 'rgb(255, 209, 102)'
+yale_blue <- 'rgb(8, 72, 135)'
 
 # read data 
 # TODO: externalize this
@@ -28,6 +33,7 @@ df$glucose_mgdl <- as.numeric(df$glucose_mgdl)
 df <- df %>% filter(event_type == 'EGV' & !is.na(glucose_mgdl))
 df$timestamp <- ymd_hms(df$timestamp_src, tz = 'Europe/Vienna')
 df$time <- hms::as_hms(format(df$timestamp, format = "%H:%M:%S"))
+df$hour <- hour(df$timestamp)
 
 # grab last date
 lastRow <- tail(df, n = 1)
@@ -174,19 +180,21 @@ shinyServer(function(input, output, session) {
       plot_ly(df_sample, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
-                  line = list(color = 'rgb(0,0,0)', width = 3),
+                  line = list(color = 'black', width = 3),
                   hoverinfo = 'text',
                   text = ~paste(glucose_mgdl, 'mg/dl at', time)) %>% 
         # lower threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = bloody_red, dash = 'dash'),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = bloody_red, dash = 'dash'),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                title = paste('Glucose values on ', 
@@ -217,7 +225,7 @@ shinyServer(function(input, output, session) {
       fig <- plot_ly(df_sample, type = 'scatter', mode = 'lines', height = 200) %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
-                  line = list(color = 'rgb(0,0,0)', width = 1.2),
+                  line = list(color = 'black', width = 1.2),
                   hoverinfo = 'text',
                   text = ~paste(glucose_mgdl, 'mg/dl on', date(timestamp), "at", time)) %>% 
         layout(xaxis = list(title='Day/Time'), 
@@ -234,15 +242,15 @@ shinyServer(function(input, output, session) {
       main_pattern1 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                   x0 = df_sample[pattern_locations1[1], 'timestamp'], 
                   x1 = df_sample[pattern_locations1[1], 'timestamp'],
-                  line = list(color = "red", width = 3))
+                  line = list(color = bloody_red, width = 3))
       main_pattern2 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                    x0 = df_sample[pattern_locations2[1], 'timestamp'], 
                    x1 = df_sample[pattern_locations2[1], 'timestamp'],
-                   line = list(color = "blue", width = 3))
+                   line = list(color = yale_blue, width = 3))
       main_pattern3 <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                    x0 = df_sample[pattern_locations3[1], 'timestamp'], 
                    x1 = df_sample[pattern_locations3[1], 'timestamp'],
-                   line = list(color = "green", width = 3))
+                   line = list(color = slimy_green, width = 3))
       shapes <- list(main_pattern1, main_pattern2, main_pattern3)
       
       # add neighbours
@@ -250,19 +258,19 @@ shinyServer(function(input, output, session) {
         shapes[[length(shapes) + 1]] <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                                             x0 = df_sample[pattern_locations1[i], 'timestamp'], 
                                             x1 = df_sample[pattern_locations1[i], 'timestamp'],
-                                            line = list(color = "red", width = 0.8, dash = 5))
+                                            line = list(color = bloody_red, width = 0.8, dash = 5))
       }
       for(i in 2:length(pattern_locations2)) {
         shapes[[length(shapes) + 1]] <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                                              x0 = df_sample[pattern_locations2[i], 'timestamp'], 
                                              x1 = df_sample[pattern_locations2[i], 'timestamp'],
-                                             line = list(color = "blue", width = 0.8, dash = 5))
+                                             line = list(color = yale_blue, width = 0.8, dash = 5))
       }
       for(i in 2:length(pattern_locations3)) {
         shapes[[length(shapes) + 1]] <- list(y0 = min(df_sample$glucose_mgdl), y1 = max(df_sample$glucose_mgdl),
                                              x0 = df_sample[pattern_locations3[i], 'timestamp'], 
                                              x1 = df_sample[pattern_locations3[i], 'timestamp'],
-                                             line = list(color = "green", width = 0.8, dash = 5))
+                                             line = list(color = slimy_green, width = 0.8, dash = 5))
       }
       
       # build the final plot
@@ -291,7 +299,7 @@ shinyServer(function(input, output, session) {
         add_trace(x = ~0:input$pattern_window_size, 
                   y = df_sample[pattern_locations1[1]:(pattern_locations1[1] + input$pattern_window_size), 
                                 'glucose_mgdl'],
-                  line = list(color = 'red', width = 3),
+                  line = list(color = bloody_red, width = 3),
                   hoverinfo = 'none')
       
       # ad neighboring patterns
@@ -307,12 +315,14 @@ shinyServer(function(input, output, session) {
         add_segments(x = ~0, xend = ~input$pattern_window_size, 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~0, xend = ~input$pattern_window_size,
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time-Index'), 
                               yaxis = list(title = 'Blood sugar (mg/dl)'),
                               showlegend = FALSE) 
@@ -322,7 +332,7 @@ shinyServer(function(input, output, session) {
         add_trace(x = ~0:input$pattern_window_size, 
                   y = df_sample[pattern_locations2[2]:(pattern_locations2[2] + input$pattern_window_size), 
                                 'glucose_mgdl'],
-                  line = list(color = 'blue', width = 3),
+                  line = list(color = yale_blue, width = 3),
                   hoverinfo = 'none')
       
       for(i in 2:length(pattern_locations2)) {
@@ -337,12 +347,14 @@ shinyServer(function(input, output, session) {
         add_segments(x = ~0, xend = ~input$pattern_window_size, 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~0, xend = ~input$pattern_window_size,
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time-Index'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                showlegend = FALSE)
@@ -352,7 +364,7 @@ shinyServer(function(input, output, session) {
         add_trace(x = ~0:input$pattern_window_size, 
                   y = df_sample[pattern_locations3[2]:(pattern_locations3[2] + input$pattern_window_size), 
                                 'glucose_mgdl'],
-                  line = list(color = 'green', width = 3),
+                  line = list(color = slimy_green, width = 3),
                   hoverinfo = 'none')
       
       for(i in 2:length(pattern_locations3)) {
@@ -367,12 +379,14 @@ shinyServer(function(input, output, session) {
         add_segments(x = ~0, xend = ~input$pattern_window_size, 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~0, xend = ~input$pattern_window_size,
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.6),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time-Index'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                showlegend = FALSE)
@@ -411,19 +425,21 @@ shinyServer(function(input, output, session) {
       plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
-                  line = list(color = 'red', width = 3),
+                  line = list(color = bloody_red, width = 3),
                   hoverinfo = 'text',
                   text = ~paste(glucose_mgdl, 'mg/dl at', time)) %>% 
         # lower threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                title = paste(c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", 
@@ -452,19 +468,21 @@ shinyServer(function(input, output, session) {
       plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
-                  line = list(color = 'blue', width = 3),
+                  line = list(color = yale_blue, width = 3),
                   hoverinfo = 'text',
                   text = ~paste(glucose_mgdl, 'mg/dl at', time)) %>% 
         # lower threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                title = paste(c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", 
@@ -492,19 +510,21 @@ shinyServer(function(input, output, session) {
       plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
-                  line = list(color = 'green', width = 3),
+                  line = list(color = slimy_green, width = 3),
                   hoverinfo = 'text',
                   text = ~paste(glucose_mgdl, 'mg/dl at', time)) %>% 
         # lower threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~low_thr, yend = ~low_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'High threshold') %>% 
+                     name = 'High threshold',
+                     hoverinfo = 'none') %>% 
         # upper threshold
         add_segments(x = ~min(timestamp), xend = ~max(timestamp), 
                      y = ~high_thr, yend = ~high_thr,
                      line = list(color = 'black', width = 0.7),
-                     name = 'Low threshold') %>% 
+                     name = 'Low threshold',
+                     hoverinfo = 'none') %>% 
         layout(xaxis = list(title='Time'), 
                yaxis = list(title = 'Blood sugar (mg/dl)'),
                title = paste(c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", 
@@ -545,6 +565,136 @@ shinyServer(function(input, output, session) {
       mean <- mean(df_sample$glucose_mgdl)
       
       paste(round(sd/mean * 100, digits = 1), '%')
+    })
+    
+    # overall trends, i.e. an overview graph with median, 25/75 and 10/90 percentiles
+    output$overall_daily_trend <- renderPlotly({
+      df_sample <- overview_sample()
+      
+      # compute quantiles and median
+      glucose_summary <- df_sample %>% group_by(hour) %>% 
+        summarise(median = median(glucose_mgdl),
+                  quantile_10 = quantile(glucose_mgdl, 0.1),
+                  quantile_25 = quantile(glucose_mgdl, 0.25),
+                  quantile_75 = quantile(glucose_mgdl, 0.75),
+                  quantile_90 = quantile(glucose_mgdl, 0.90))
+      
+      # extract a somewhat nice time format
+      glucose_summary$time <- ordered(format(
+        strptime(parse_date_time(glucose_summary$hour, 'H'), 
+                 "%Y-%m-%d %H:%M:%S"),
+        '%H:%M'))
+      
+      # and plot
+      glucose_summary %>% 
+        plot_ly(type = 'scatter', mode = 'lines') %>% 
+        add_trace(x = ~time, y = ~quantile_25, 
+                  line = list(width = 0),
+                  showlegend = FALSE,
+                  hoverinfo = 'none') %>% 
+        add_trace(x = ~time, y = ~quantile_10, 
+                  line = list(width = 0),
+                  opacity = 0.2,
+                  name = '10th percentile',
+                  fill = 'tonexty',
+                  fillcolor = 'rgba(0,0,0, 0.05)',
+                  hoverinfo = 'none') %>%
+        add_trace(x = ~time, y = ~median, 
+                  line = list(width = 0), # width 0 to enable filling
+                  showlegend = FALSE,
+                  hoverinfo = 'none') %>% 
+        add_trace(x = ~time, y = ~quantile_25, 
+                  line = list(width = 0),
+                  opacity = 0.5,
+                  name = '25th percentile',
+                  fill = 'tonexty',
+                  fillcolor = 'rgba(0,0,0, 0.15)',
+                  hoverinfo = 'none') %>% 
+        add_trace(x = ~time, y = ~median, 
+                  line = list(shape = "linear", color = 'black', width = 3),
+                  hoverinfo = 'text',
+                  text = ~median,
+                  name = 'Median') %>% 
+        add_trace(x = ~time, y = ~quantile_75, 
+                  line = list(width = 0),
+                  opacity = 0.5,
+                  name = '75th percentile',
+                  fill = 'tonexty',
+                  fillcolor = 'rgba(0,0,0, 0.15)',
+                  hoverinfo = 'none') %>% 
+        add_trace(x = ~time, y = ~quantile_90, 
+                  line = list(width = 0),
+                  opacity = 0.2,
+                  name = '90th percentile',
+                  fill = 'tonexty',
+                  fillcolor = 'rgba(0,0,0, 0.05)',
+                  hoverinfo = 'none') %>% 
+        # lower threshold
+        add_segments(x = ~min(time), xend = ~max(time), 
+                     y = ~low_thr, yend = ~low_thr,
+                     line = list(color = bloody_red, dash = 'dash'),
+                     name = 'High threshold',
+                     showlegend = FALSE,
+                     hoverinfo = 'none') %>% 
+        # upper threshold
+        add_segments(x = ~min(time), xend = ~max(time), 
+                     y = ~high_thr, yend = ~high_thr,
+                     line = list(color = bloody_red, dash = 'dash'),
+                     name = 'Low threshold',
+                     showlegend = FALSE,
+                     hoverinfo = 'none') %>% 
+        layout(xaxis = list(title='Time'), 
+               yaxis = list(title = 'Blood sugar (mg/dl)'),
+               title = "Overall Daily Trend")
+    })
+    
+    # stacked bar chart for time in range
+    output$time_in_range <- renderPlotly({
+      df_sample <- overview_sample()
+      
+      range_percentages <- df_sample %>% 
+        summarise(extreme_low_pct = sum(glucose_mgdl <= extreme_low_thr) / n() * 100,
+                  low_pct = sum(glucose_mgdl <= low_thr & glucose_mgdl > extreme_low_thr) / n() * 100, 
+                  in_range_pct = sum(glucose_mgdl < high_thr & glucose_mgdl > low_thr) / n() * 100, 
+                  high_pct = sum(glucose_mgdl >= high_thr & glucose_mgdl < extreme_high_thr) / n() * 100, 
+                  extreme_high_pct = sum(glucose_mgdl >= extreme_high_thr) / n() * 100)
+      
+      range_percentages %>% plot_ly() %>% 
+        add_trace(x = 0, y = ~extreme_low_pct, type = 'bar',
+                  marker = list(color = bloody_red),
+                  width = 0.5,
+                  name = paste('<=', extreme_low_thr),
+                  hoverinfo = 'text',
+                  text = ~paste(round(extreme_low_pct, digits = 2), '%')) %>% 
+        add_trace(x = 0, y = ~low_pct, type = 'bar',
+                  marker = list(color = crayon_yellow),
+                  width = 0.5,
+                  name = paste('>', extreme_low_thr, 'and <=', low_thr),
+                  hoverinfo = 'text',
+                  text = ~paste(round(low_pct, digits = 2), '%')) %>% 
+        add_trace(x = 0, y = ~in_range_pct, type = 'bar',
+                  marker = list(color = slimy_green),
+                  width = 0.5,
+                  opacity = 0.9,
+                  name = paste('>', low_thr, 'and <', high_thr),
+                  hoverinfo = 'text',
+                  text = ~paste(round(in_range_pct, digits = 2), '%')) %>% 
+        add_trace(x = 0, y = ~high_pct, type = 'bar',
+                  marker = list(color = crayon_yellow),
+                  width = 0.5,
+                  name = paste('>=', high_thr, 'and <', extreme_high_thr),
+                  hoverinfo = 'text',
+                  text = ~paste(round(high_pct, digits = 2), '%')) %>% 
+        add_trace(x = 0, y = ~extreme_high_pct, type = 'bar',
+                  marker = list(color = bloody_red),
+                  width = 0.5,
+                  name = paste('>=', extreme_high_thr),
+                  hoverinfo = 'text',
+                  text = ~paste(round(extreme_high_pct, digits = 2), '%')) %>% 
+        layout(barmode = 'stack',
+               title = 'Time in Range',
+               xaxis = list(title = '', showgrid = FALSE, visible = FALSE),
+               yaxis = list(title = '', showgrid = FALSE, visible = TRUE))
     })
 })
 
