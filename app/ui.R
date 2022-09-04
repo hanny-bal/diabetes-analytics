@@ -1,12 +1,14 @@
 library(shiny)
 library(shinyjs)
 library(plotly)
+library(bslib)
 
 # Define UI
 shinyUI(
   navbarPage(
     "diAnalytics",
     useShinyjs(),
+    theme = bs_theme(version = 4, bootswatch = "journal", primary = 'rgb(205, 12, 24)'),
     
     # --------------------------------
     #  Daily overview of blood sugar - 
@@ -37,27 +39,36 @@ shinyUI(
         
         # Show a plot of the generated distribution
         mainPanel(
-          plotOutput("patternRecResultSimple"),
-          plotlyOutput('patternRecResult')
+          plotlyOutput('patternRecResult', height = 240),
+          plotlyOutput('patternOverview', height = 300)
         )
       ),
       
       # display the individual patterns in more detail
       fluidRow(
+        column(12,
+               style = 'margin-bottom: 20px',
+               align = 'center',
+               h2('Details'))
+      ),
+      fluidRow(
+        style = 'margin-left: 40px; margin-right: 40px',
+        align = 'center',
         column(4,
+          align = 'center',
           id = 'pattern-details-1',
           selectInput('motif1_select', 'Pattern 1: Examples', choices=c()),
-          plotOutput('motif1')
+          plotlyOutput('motif1')
         ),
         column(4,
           id = 'pattern-details-2',
           selectInput('motif2_select', 'Pattern 2: Examples', choices=c()),
-          plotOutput('motif2')
+          plotlyOutput('motif2')
         ),
         column(4,
           id = 'pattern-details-3',
           selectInput('motif3_select', 'Pattern 3: Examples', choices=c()),
-          plotOutput('motif3')
+          plotlyOutput('motif3')
         ),
       )
     )
