@@ -1,9 +1,15 @@
+# devtools::install_github("hadley/emo")
+
 library(shiny)
 library(plotly)
 library(lubridate)
 library(dplyr)
 library(tsmp)
 library(shinyjs)
+
+# -----------------
+# - Preprocessing -
+# -----------------
 
 # activate autoreload
 options(shiny.autoreload = TRUE)
@@ -22,22 +28,89 @@ yale_blue <- 'rgb(8, 72, 135)'
 
 # read data 
 # TODO: externalize this
-df <- read.csv('../data/clarity_export_20220730.csv', sep = ';')
-colnames(df) <- c('index', 'timestamp_src', 'event_type', 'event_subtype', 
-                  'patient_info', 'device_info', 'source_device', 'glucose_mgdl',
-                  'insulin_u', 'carbohydrates_g', 'duration', 'glucose_change_rate',
-                  'emitter_time', 'emitter_id')
+input_data <- 2
 
+# option 1: read data from dexcom clarity
+if(input_data == 1) {
+  df <- read.csv('../data/clarity_export_20220730.csv', sep = ';')
+  colnames(df) <- c('index', 'timestamp_src', 'event_type', 'event_subtype', 
+                    'patient_info', 'device_info', 'source_device', 'glucose_mgdl',
+                    'insulin_u', 'carbohydrates_g', 'duration', 'glucose_change_rate',
+                    'emitter_time', 'emitter_id')
+  
+  df$glucose_mgdl <- as.numeric(df$glucose_mgdl)
+  df <- df %>% filter(event_type == 'EGV' & !is.na(glucose_mgdl))
+  df$timestamp <- ymd_hms(df$timestamp_src, tz = 'Europe/Vienna')
+}
+
+# option 2: read data from David's blood sugar app
+if(input_data == 2) {
+  df <- read.csv('../data/glucose_hist.csv')
+  colnames(df) <- c('timestamp_src', 'glucose_mgdl')
+  df$timestamp_src <- as.numeric(df$timestamp_src)
+  df <- df %>% filter(!is.na(df$timestamp_src))
+  df$timestamp <- as_datetime(df$timestamp_src, tz = 'Europe/Vienna')
+  df <- df[order(df$timestamp),]
+  
+  # also read food data
+  food_df <- read.csv('../data/food_hist.csv')
+  colnames(food_df) <- c('fat', 'carbs', 'protein', 'calories', 'be',
+                         'amount', 'unit', 'name', 'timestamp_src')
+  # TODO: please use different separators than "," or at least quote the text
+  # filter corrupted rows here 
+  food_df <- food_df %>% filter(!is.na(as.numeric(food_df$timestamp_src))) %>% 
+    filter(as.numeric(timestamp_src) > 0)
+  food_df$timestamp_src <- as.numeric(food_df$timestamp_src)
+  food_df$be <- as.numeric(food_df$be)
+  food_df <- food_df %>% filter(!is.na(food_df$be))
+  food_df$timestamp <- as_datetime(food_df$timestamp_src, tz = 'Europe/Vienna')
+  food_df <- food_df[order(food_df$timestamp),]
+}
+  
 # get only measures and parse timestamp
-df$glucose_mgdl <- as.numeric(df$glucose_mgdl)
-df <- df %>% filter(event_type == 'EGV' & !is.na(glucose_mgdl))
-df$timestamp <- ymd_hms(df$timestamp_src, tz = 'Europe/Vienna')
 df$time <- hms::as_hms(format(df$timestamp, format = "%H:%M:%S"))
 df$hour <- hour(df$timestamp)
 
 # grab last date
 lastRow <- tail(df, n = 1)
 lastDate <- date(lastRow[1,'timestamp'])
+
+# -------------
+# - Functions -
+# -------------
+# load food if available
+add_food_to_plot <- function(food_sample, fig) {
+  if(nrow(food_sample) > 0) {
+    # summarize multiple foods at the same time
+    # TODO: is it intentional that there is at most one meal a day?
+    food_sample <- food_sample %>% group_by(timestamp) %>% 
+      summarise(be = sum(be), name = paste(name, collapse = ', ')) 
+    
+    for(i in 1:nrow(food_sample)) {
+      datetime <- food_sample[i, 'timestamp']
+      info_text <- paste(strwrap(food_sample[i, 'name'], 50), collapse = '\n')
+      info_text <- paste(info_text, '\n\n', 
+                         round(food_sample[i, 'be'], digits = 2), 
+                         ' BE',
+                         sep = '')
+      
+      # add food to the plot 
+      fig <- fig %>% add_text(text = ~emo::ji('food'),
+                              hovertext = ~info_text,
+                              hoverinfo = "text",
+                              size = I(40),
+                              y = 100,
+                              x = ~datetime$timestamp)
+    }
+  }
+  return(fig)
+}
+
+
+# function to check if the food dataframe exists
+food_df_exists <- function() {
+  return (exists('food_df') && is.data.frame(get('food_df')))
+}
 
 # ----------------------------------------------------
 # - Define server logic required to draw a histogram -
@@ -177,7 +250,7 @@ shinyServer(function(input, output, session) {
         need(nrow(df_sample) > 0, 'No data available on the selected day.')
       )
       
-      plot_ly(df_sample, type = 'scatter', mode = 'lines') %>% 
+      fig <- plot_ly(df_sample, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
                   line = list(color = 'black', width = 3),
@@ -204,11 +277,20 @@ shinyServer(function(input, output, session) {
                              input$daywise_ts,
                              sep = ''),
                showlegend = FALSE)
+      
+      # load food if available
+      if(food_df_exists()) {
+        food_sample <- food_df %>% filter(date(food_df$timestamp) == input$daywise_ts)
+        fig <- add_food_to_plot(food_sample, fig)
+      }
+      
+      fig
+      
     })
     
-    # --------------------------------------------------
-    #  Display daily time series of blood sugar values - 
-    # --------------------------------------------------
+    # ------------------------------------------------------
+    #  Display result of the pattern recognition algorithm - 
+    # ------------------------------------------------------
 
     # total time series data with marked motifs
     output$patternRecResult <- renderPlotly({
@@ -420,9 +502,10 @@ shinyServer(function(input, output, session) {
       )
       
       # aaand plot
-      df_sample_region <- df_sample[start_index:end_index,]
+      df_sample_region <- df_sample[start_index:end_index,] %>% 
+        filter(!is.na(glucose_mgdl))
       
-      plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
+      fig <- plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
                   line = list(color = bloody_red, width = 3),
@@ -446,6 +529,15 @@ shinyServer(function(input, output, session) {
                                "Friday", "Saturday")[as.POSIXlt(date(df_sample_region$timestamp[1]))$wday + 1],
                              date(df_sample_region$timestamp[1]), sep = ', '),
                showlegend = FALSE)
+      
+      # load food if available
+      if(food_df_exists()) {
+        food_sample <- food_df %>% filter(food_df$timestamp >= min(df_sample_region$timestamp) &
+                                          food_df$timestamp <= max(df_sample_region$timestamp))
+        fig <- add_food_to_plot(food_sample, fig)
+      }
+      
+      fig
     })
     
     # show samples of the second pattern
@@ -463,9 +555,10 @@ shinyServer(function(input, output, session) {
       )
       
       # aaand plot
-      df_sample_region <- df_sample[start_index:end_index,]
+      df_sample_region <- df_sample[start_index:end_index,] %>% 
+        filter(!is.na(glucose_mgdl))
       
-      plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
+      fig <- plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
                   line = list(color = yale_blue, width = 3),
@@ -489,6 +582,14 @@ shinyServer(function(input, output, session) {
                                      "Friday", "Saturday")[as.POSIXlt(date(df_sample_region$timestamp[1]))$wday + 1], 
                              date(df_sample_region$timestamp[1]), sep = ', '),
                showlegend = FALSE)
+      
+      if(food_df_exists()) {
+        food_sample <- food_df %>% filter(food_df$timestamp >= min(df_sample_region$timestamp) &
+                                            food_df$timestamp <= max(df_sample_region$timestamp))
+        fig <- add_food_to_plot(food_sample, fig)
+      }
+      
+      fig
     })
     
     # show samples of the third pattern
@@ -505,9 +606,10 @@ shinyServer(function(input, output, session) {
         need(!is.na(end_index), "Could not compute end index.")
       )
       
-      df_sample_region <- df_sample[start_index:end_index,]
+      df_sample_region <- df_sample[start_index:end_index,] %>% 
+        filter(!is.na(glucose_mgdl))
       
-      plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
+      fig <- plot_ly(df_sample_region, type = 'scatter', mode = 'lines') %>% 
         add_trace(x = ~timestamp, y = ~glucose_mgdl, 
                   name = 'Blood sugar',
                   line = list(color = slimy_green, width = 3),
@@ -531,6 +633,14 @@ shinyServer(function(input, output, session) {
                                      "Friday", "Saturday")[as.POSIXlt(date(df_sample_region$timestamp[1]))$wday + 1],
                              date(df_sample_region$timestamp[1]), sep = ', '),
                showlegend = FALSE)
+      
+      if(food_df_exists()) {
+        food_sample <- food_df %>% filter(food_df$timestamp >= min(df_sample_region$timestamp) &
+                                            food_df$timestamp <= max(df_sample_region$timestamp))
+        fig <- add_food_to_plot(food_sample, fig)
+      }
+      
+      fig
     })
     
     # ---------------------------------------------------------
