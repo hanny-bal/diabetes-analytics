@@ -28,7 +28,7 @@ yale_blue <- 'rgb(8, 72, 135)'
 
 # read data 
 # TODO: externalize this
-input_data <- 2
+input_data <- 1 # 1 = my own data, 2 = other person's data
 
 # option 1: read data from dexcom clarity
 if(input_data == 1) {
