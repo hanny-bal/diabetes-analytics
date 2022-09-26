@@ -1,5 +1,4 @@
 # DiAnalytics (Diabetes Analytics)
-![](https://geps.dev/progress/70)
 
 An R shiny app for analyzing blood sugar data, specifically targeted towards type 1 diabetics. All plots are made with [Plotly for R](https://plotly.com/r/), making the dashboard interactive in every aspect. The app consists of three primary views.
 
