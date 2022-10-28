@@ -32,7 +32,7 @@ input_data <- 1 # 1 = my own data, 2 = other person's data
 
 # option 1: read data from dexcom clarity
 if(input_data == 1) {
-  df <- read.csv('../data/clarity_export_20220730.csv', sep = ';')
+  df <- read.csv('../data/clarity_export_20221027.csv', sep = ';')
   colnames(df) <- c('index', 'timestamp_src', 'event_type', 'event_subtype', 
                     'patient_info', 'device_info', 'source_device', 'glucose_mgdl',
                     'insulin_u', 'carbohydrates_g', 'duration', 'glucose_change_rate',

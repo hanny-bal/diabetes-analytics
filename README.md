@@ -1,6 +1,8 @@
 # DiAnalytics (Diabetes Analytics)
 
-An R shiny app for analyzing blood sugar data, specifically targeted towards type 1 diabetics. All plots are made with [Plotly for R](https://plotly.com/r/), making the dashboard interactive in every aspect. The app consists of three primary views.
+An R shiny app for analyzing blood sugar data, specifically targeted towards type 1 diabetics. All plots are made with [Plotly for R](https://plotly.com/r/), making the dashboard interactive. 
+
+The app consists of three primary views:
 
 ## Overview
 Computes basic statistics like the mean glucose value, estimated a1c, standard deviation or glucose variability for a specified time-frame and plots the time-in-range as well as daily patterns occuring during that time based on on hourly quantiles. Basically, the overview is an interactive [AGP Report](http://www.agpreport.org/agp/agpreports).
