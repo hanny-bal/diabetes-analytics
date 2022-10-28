@@ -1,14 +1,4 @@
 # DiAnalytics (Diabetes Analytics)
-
-<style>
-.center {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 50%;
-}
-</style>
-
 An R shiny app for analyzing blood sugar data, specifically targeted towards type 1 diabetics. All plots are made with [Plotly for R](https://plotly.com/r/), making the dashboard interactive. 
 
 The app consists of three primary views:
@@ -26,4 +16,4 @@ Plots the glucose graph for a specified day.
 ## Pattern Recognition
 An experimental page for automatized pattern recognition with algorithms based on the matrix profile. The matrix profile of a time-series is a vector that stores the normalized Euclidean distance between any subsequence within a time series and its nearest neighbor. An efficient implementation of matrix profile algorithms is available in the [tsmp](https://github.com/matrix-profile-foundation/tsmp) package - which is also used in this app.
 
-<img src="/screenshots/dianalytics_patterns.png" width="80%" class="center"/>
+<img src="/screenshots/dianalytics_patterns.png" style="width: 50%, margin: auto"/>
