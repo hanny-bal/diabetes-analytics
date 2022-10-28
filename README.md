@@ -16,4 +16,6 @@ Plots the glucose graph for a specified day.
 ## Pattern Recognition
 An experimental page for automatized pattern recognition with algorithms based on the matrix profile. The matrix profile of a time-series is a vector that stores the normalized Euclidean distance between any subsequence within a time series and its nearest neighbor. An efficient implementation of matrix profile algorithms is available in the [tsmp](https://github.com/matrix-profile-foundation/tsmp) package - which is also used in this app.
 
-<img src="/screenshots/dianalytics_patterns.png" style="width: 50%, margin: auto"/>
+<center>
+  <img src="/screenshots/dianalytics_patterns.png" width="70%"/>
+</center>
